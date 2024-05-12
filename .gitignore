@@ -1,0 +1,5 @@
+.idea/*
+.idea
+news/ml_models/*
+news/ml_models/.idea
+news/logs/*

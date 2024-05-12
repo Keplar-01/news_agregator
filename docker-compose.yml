@@ -1,0 +1,39 @@
+version: '3'
+
+services:
+#  agregator:
+#    build: agregator/
+#    ports:
+#      - "8001:8000"
+#    networks:
+#      - backend
+
+  news:
+    build: news/
+    ports:
+      - "8002:8000"
+    environment:
+      - DB_URL=postgresql://root:root@postgres:5432/news_db
+    depends_on:
+      - postgres
+    volumes:
+      - ./news:/app/news
+    links:
+      - postgres
+    networks:
+      - backend
+
+  postgres:
+    image: postgres
+    environment:
+      - POSTGRES_USER=root
+      - POSTGRES_PASSWORD=root
+      - POSTGRES_DB=news_db
+    ports:
+      - "5432:5432"
+    networks:
+      - backend
+
+networks:
+  backend:
+    driver: bridge
