@@ -1,0 +1,32 @@
+.register-form-group {
+  display: flex;
+  justify-content: space-between;
+}
+.register-container {
+  width: 100%;
+  margin: auto;
+  padding: 10px;
+  border-radius: 5px;
+  margin-top: 10px;
+}
+.register-form-group label {
+display: block;
+  margin-right: 10px;
+}
+
+.register-form-label {
+  display: block;
+}
+
+.register-form-submit {
+  display: block;
+  margin: auto;
+}
+
+.register-form-group .form-label {
+  display: block;
+}
+
+.register-container .register-form-label .form-label {
+  display: block;
+}

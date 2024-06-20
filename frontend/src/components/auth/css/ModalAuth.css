@@ -1,0 +1,43 @@
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.modal-content {
+  background-color: white;
+  padding: 20px;
+  border-radius: 4px;
+  width: 80%;
+  max-width: 500px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.modal-content button {
+  margin-top: 10px;
+}
+
+.btn-group .btn {
+  border-right: 1px solid #ccc;
+}
+
+.btn-group .btn:last-child {
+  border-right: none;
+}
+
+.form-container {
+  width: 100%;
+  margin: auto;
+  padding: 10px;
+  border: 1px solid gray;
+  border-radius: 5px;
+  margin-top: 10px;
+}

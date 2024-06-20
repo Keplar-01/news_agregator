@@ -4,9 +4,9 @@ from sqlalchemy.orm import Session
 
 from models import parse_data as _orm
 from schemas import parse_data_schema as _schema
+from repositories.interface_repository import RepositoryInterface
 
-
-class ParseDataRepository():
+class ParseDataRepository(RepositoryInterface):
     def __init__(self, session: Session):
         self.session = session
 

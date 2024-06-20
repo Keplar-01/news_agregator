@@ -1,0 +1,10 @@
+.label {
+margin: 5px;
+}
+
+.error-message {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  color: red;
+}

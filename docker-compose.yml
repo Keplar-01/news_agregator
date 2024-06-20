@@ -1,21 +1,41 @@
 version: '3'
 
 services:
-#  agregator:
-#    build: agregator/
-#    ports:
-#      - "8001:8000"
-#    networks:
-#      - backend
+  agregator:
+    build: ./agregator
+    volumes:
+      - ./agregator:/app/agregator
+    depends_on:
+      - rabbitmq
+    networks:
+      - backend
+
+  rabbitmq:
+    image: "rabbitmq:3-management"
+    container_name: rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    networks:
+      - backend
+    healthcheck:
+      test: rabbitmq-diagnostics -q status && rabbitmq-diagnostics -q check_local_alarms
+      interval: 30s
+      timeout: 3s
+      retries: 3
+
 
   news:
     build: news/
     ports:
       - "8002:8000"
+    command: ["uvicorn", "news:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
     environment:
       - DB_URL=postgresql://root:root@postgres:5432/news_db
     depends_on:
       - postgres
+      - rabbitmq
+      - agregator
     volumes:
       - ./news:/app/news
     links:
@@ -33,6 +53,20 @@ services:
       - "5432:5432"
     networks:
       - backend
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    ports:
+      - "3000:3000"
+    command: [ "npm", "start" ]
+    environment:
+      - CHOKIDAR_USEPOLLING=true
+      - REACT_APP_NEWS_API_URL=http://localhost:8002
 
 networks:
   backend:

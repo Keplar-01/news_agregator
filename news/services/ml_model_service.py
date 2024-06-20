@@ -1,138 +1,75 @@
-import os
-import pickle
-import re
-import pandas as pd
-import numpy as np
-import nltk
-import re
-import joblib
+from sqlalchemy.orm import Session
+from repositories.ml_model_repository import MlModelRepository
+from schemas.ml_models_schema import MlModelInput, MlModelOutput
 
-from keras.src.saving import load_model as load_model_keras
-from keras.src.utils import pad_sequences
-
-nltk.download("stopwords")
-nltk.download('punkt')
-
-from nltk.corpus import stopwords
-from string import punctuation
-from nltk import word_tokenize
-import re
-from nltk.corpus import stopwords
-from gensim.models import Word2Vec
-import keras as keras
-# Загрузка стоп-слов для русского языка
-stop_words = set(stopwords.words('russian'))
-
-class SingletonMeta(type):
-    _instances = {}
-
-    def __call__(cls, *args, **kwargs):
-        if cls not in cls._instances:
-            instance = super().__call__(*args, **kwargs)
-            cls._instances[cls] = instance
-        return cls._instances[cls]
+from services.producer_service import producer_contol
 
 
-class MlModelService(metaclass=SingletonMeta):
-    def __init__(self, model_name: str = 'model_svm.pkl', tokenizer_name: str = 'tokenizer.pkl', encoder_name: str = 'encoder.pkl'):
-        if not hasattr(self, 'tokenizer'):
-            self.tokenizer = self.load_tokenizer(tokenizer_name)
-        if not hasattr(self, 'encoder'):
-            self.encoder = self.load_encoder(encoder_name)
-        if not hasattr(self, 'model'):
-            self.model = self.load_model(model_name)
+class MlModelService:
+    def __init__(self, session: Session):
+        self.ml_model_repository = MlModelRepository(session)
 
-    def set_model(self, model_name:str='model_svm.pkl'):
-        self.model = self.load_model(model_name)
+    async def create(self, ml_model: MlModelInput) -> MlModelOutput:
+        new_ml_model = await self.ml_model_repository.create(ml_model)
+        return MlModelOutput.from_orm(new_ml_model)
 
-    def preprocess_text_to_tokens(self, text: str):
-        # Приведение к нижнему регистру
-        text = text.lower()
-        # Удаление пунктуации
-        text = re.sub(r'[^\w\s]', '', text)
-        # Токенизация текста
-        tokens = word_tokenize(text, language='russian')
-        # Удаление стоп-слов
-        tokens = [word for word in tokens if word not in stop_words]
-        # Объединение токенов обратно в текст
-        return tokens
+    async def get_all(self) -> list[MlModelOutput]:
+        all_ml_models = await self.ml_model_repository.get_all()
+        return [MlModelOutput.from_orm(model) for model in all_ml_models]
 
-    def preprocess_text_to_vector(self):
-        pass
+    async def get_by_id(self, ml_model_id: int) -> MlModelOutput:
+        ml_model = await self.ml_model_repository.get_by_id(ml_model_id)
+        if not ml_model:
+            return None
+        return MlModelOutput.from_orm(ml_model)
 
-    def preprocess_text_to_one_text(self, text: str):
-        # Приведение к нижнему регистру
-        text = text.lower()
-        # Удаление пунктуации
-        text = re.sub(r'[^\w\s]', '', text)
-        # Токенизация текста
-        tokens = word_tokenize(text)
-        # Удаление стоп-слов
-        tokens = [word for word in tokens if word not in stop_words]
-        # Объединение токенов обратно в текст
-        return " ".join(tokens)
+    async def get_active(self) -> MlModelOutput:
+        ml_model = await self.ml_model_repository.get_active()
+        if not ml_model:
+            return None
+        return MlModelOutput.from_orm(ml_model)
 
-    def train_model(self):
-        pass
+    async def update(self, ml_model_id: int, data: MlModelInput) -> dict:
+        db_ml_model = await self.ml_model_repository.get_by_id(ml_model_id)
+        if not db_ml_model:
+            return {"success": False, "result": "Запись не найдена"}
 
-    def save_tokenizer(self, tokenizer, filename):
-        with open(filename, 'wb') as handle:
-            joblib.dump(tokenizer, handle, protocol=pickle.HIGHEST_PROTOCOL)
+        db_ml_model = await self.ml_model_repository.update(db_ml_model, data)
+        return {"success": True, "result": MlModelOutput.from_orm(db_ml_model)}
 
-    def load_tokenizer(self, filename):
-        script_dir = os.path.dirname(__file__)
-        model_path = os.path.join(script_dir, '..', 'ml_models/tokenizer', filename)
+    async def delete(self, ml_model_id: int) -> dict:
+        db_ml_model = await self.ml_model_repository.get_by_id(ml_model_id)
+        if not db_ml_model:
+            return {"success": False, "result": "Запись не найдена"}
 
-        with open(model_path, 'rb') as f:
-            tokenizer = joblib.load(f)
-            return tokenizer
+        await self.ml_model_repository.delete(db_ml_model)
+        return {"success": True, "result": "Запись удалена"}
 
-    def save_w2v_model(self, w2v_model, filename):
-        w2v_model.save(filename)
+    async def update_active(self, ml_model_id: int):
+        models = await self.ml_model_repository.get_all()
+        for model in models:
+            if model.id == ml_model_id:
+                model.is_active = True
+            else:
+                model.is_active = False
 
-    def load_w2v_model(self, filename):
-        return Word2Vec.load(filename)
-    
-    def load_encoder(self, filename):
-        script_dir = os.path.dirname(__file__)
-        model_path = os.path.join(script_dir, '..', 'ml_models/encoders', filename)
+            model_dict = {k: v for k, v in model.__dict__.items() if not k.startswith('_')}
+            update_data = MlModelInput(**model_dict)
+            await self.ml_model_repository.update(model, update_data)
 
-        with open(model_path, 'rb') as f:
-            loaded_encoder = pickle.load(f)
-            return loaded_encoder
-    
-    def predict(self, model, text: str, type_model: str = 'pkl'):
-        if type_model == 'pkl':
-            new_text = self.preprocess_text_to_one_text(text)
-            prediction = model.predict([new_text])
-            print(prediction)
-        else:
-            new_text = self.preprocess_text_to_tokens(text)
-            sequence = self.tokenizer.texts_to_sequences([new_text])
-            sequence = pad_sequences(sequence, maxlen=280)
-            prediction = model.predict(sequence)
-            prediction = self.encoder.inverse_transform([np.argmax(prediction)])
-        return prediction[0]
+        model = await self.ml_model_repository.get_by_id(ml_model_id)
+        message = {}
+        message['command'] = 'set_model'
+        message['path_model'] = model.path_model
+        message['path_encoder'] = model.path_encoder
+        message['path_tokenizer'] = model.path_tokenizer
+        if model.path_sub_model:
+            message['path_sub_model'] = model.path_sub_model
+        message['type'] = model.type
+        message['correlation_id'] = str(model.id)
+        await producer_contol.send(message)
+        return True
 
-
-    def save_model(self):
-        pass
-
-    def create_model(self):
-        pass
-
-    def load_model(self, name_model: str):
-        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        model_path = os.path.join(base_dir, 'ml_models', name_model)
-
-        file_extension = os.path.splitext(model_path)[1]
-
-        if file_extension == '.pkl':
-            with open(model_path, 'rb') as file:
-                model = joblib.load(file)
-        elif file_extension == '.keras':
-            model = keras.models.load_model(model_path)
-        else:
-            raise ValueError(f'Unsupported file extension: {file_extension}. Only .pickle and .keras are supported.')
-
-        return model
+    async def set_active_model(self):
+        model = await self.ml_model_repository.get_active()
+        return await self.update_active(model.id)

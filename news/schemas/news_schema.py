@@ -3,18 +3,19 @@ import pydantic as _pydantic
 
 
 class _NewsBase(_pydantic.BaseModel):
-    text: str
-    title: str
-    url: str
-    is_train: bool
-    classes: str
-    name_source: str
-    parse_data_id: int
+    text: str | None
+    title: str | None
+    url: str | None
+    is_train: bool | None
+    name_source: str | None
+    parse_data_id: int | None
+    mood: str | None
 
 
 class NewsInput(_NewsBase):
     date: _dt.datetime | None
     parse_data_id: int | None
+    classes_id: int | None = None
 
     class Config:
         from_attributes = True
@@ -25,7 +26,8 @@ class NewsOutput(_NewsBase):
     id: int
     date: _dt.datetime
     parse_data_id: int
-
+    classes_id: int
+    classes_names: str | None = None
     class Config:
         from_attributes = True
         orm_mode = True

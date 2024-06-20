@@ -1,0 +1,31 @@
+.header {
+  background-color: white;
+  padding: 20px;
+  border-bottom: 2px solid blue;
+
+}
+.header-content {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+
+}
+.nav-link {
+  margin-left: 20px;
+  border-radius: 20px;
+  background-color: blue;
+  color: white;
+  padding: 10px;
+  text-decoration: none;
+  display: inline-block;
+}
+
+.nav-link:active,
+.nav-link:focus,
+.nav-link:hover {
+  background-color: lightblue;
+}
+
+.btn-group .a {
+  border-right: 1px solid #ccc;
+}

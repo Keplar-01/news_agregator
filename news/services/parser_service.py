@@ -1,4 +1,5 @@
 import logging
+from datetime import datetime
 from typing import List
 from dateutil.parser import parse
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -14,11 +15,10 @@ from repositories.news_repository import NewsRepository
 
 from config.logs import parser_logger as jobs_logger
 
-from services.ml_model_service import MlModelService
+from services.producer_service import Producer, producer
 
 INTERVAL = 60
 
-_ml_service = MlModelService()
 class ParserService():
     def __init__(self, session: AsyncSession):
         self.repository = ParseDataRepository(session)
@@ -64,8 +64,8 @@ class ParserService():
         parse_data = await self.repository.get_all()
 
         try:
-            tasks = []
             async with aiohttp.ClientSession() as session:
+                tasks = []
                 for parse in parse_data:
                     jobs_logger.info(f'{parse_data}')
                     task = asyncio.create_task(self._get_news_urls(session, parse.url_list, parse))
@@ -77,40 +77,40 @@ class ParserService():
             return False
         return True
 
-
     async def _get_news_urls(self, session, url, parse_data):
-        tasks = []
         if parse_data.type_url == 'html':
-            pass
-        else:
-            try:
-                jobs_logger.info(f'Получаем фид по url: {url}')
-                feed = feedparser.parse(url)
-                jobs_logger.info(f'Пришло новостей: {len(feed.entries)}')
-                for entry in feed.entries:
-                    try:
-                        is_new_news = await self._repository_news.get_by_url(entry.link) is None
-                    except Exception as e:
-                        jobs_logger.error(f'Ошибка при получении данных для поиска новых новостей\n{e}\n')
-                        continue
-                    if is_new_news:
-                        task = asyncio.create_task(
-                            self.get_page_data(session, entry, parse_data.html_tag_element,
-                                               parse_data.html_attr_element_type, parse_data.html_attr_element_value,
-                                               parse_data.name, parse_data.id)
-                        )
-                        jobs_logger.info(f'Добавляем задачу по страницам\n{task.get_name()}\n')
-                        tasks.append(task)
-                        await asyncio.sleep(1)
-                    else:
-                        continue
-                await asyncio.gather(*tasks)
-            except Exception as e:
-                jobs_logger.error(f'Ошибка при получении данных\n{e}\n')
-                return False
+            return
 
+        try:
+            jobs_logger.info(f'Получаем фид по url: {url}')
+            feed = feedparser.parse(url)
+            jobs_logger.info(f'Пришло новостей: {len(feed.entries)}')
 
-    async def get_page_data(self, session, entry, html_tag, html_attr_type, html_attr_val, source_name, parse_data_id):
+            tasks = [
+                self.process_feed_entry(session, entry, parse_data) for entry in feed.entries
+            ]
+            await asyncio.gather(*tasks)
+
+        except Exception as e:
+            jobs_logger.error(f'Ошибка при получении данных\n{e}\n')
+            return False
+
+    async def process_feed_entry(self, session, entry, parse_data):
+        try:
+            is_new_news = await self._repository_news.get_by_url(entry.link) is None
+            if is_new_news:
+                async with asyncio.Semaphore(100):
+                    jobs_logger.info(f'Текст начинает собираться')
+                    await self.get_page_data(session, entry, parse_data.html_tag_element,
+                                             parse_data.html_attr_element_type,
+                                             parse_data.html_attr_element_value,
+                                             parse_data.name, parse_data.id)
+        except Exception as e:
+            jobs_logger.error(f'Ошибка при обработке записи фида\n{e}\n')
+
+    async def get_page_data(self, session, entry,
+                            html_tag, html_attr_type, html_attr_val,
+                            source_name, parse_data_id):
         try:
             async with session.get(url=entry.link) as response:
                 response_text = await response.text()
@@ -121,9 +121,6 @@ class ParserService():
         soup = BeautifulSoup(response_text, 'lxml')
         texts = soup.find_all(html_tag, {html_attr_type: html_attr_val})
         summary_text = " ".join(text.get_text().strip() for text in texts)
-
-
-
         date = parse(entry.published)
 
         new_model = _schema_news.NewsInput(
@@ -134,16 +131,20 @@ class ParserService():
             name_source=source_name,
             is_train=False,
             parse_data_id=parse_data_id,
-            classes=""
+            mood=""
         )
 
         try:
-            new_class = _ml_service.predict(_ml_service.model, summary_text, 'pkl')
-            logging.info(f'Predicted classes: {new_class}')
-            new_model.classes = new_class
-            await self._repository_news.create(new_model)
+            news = await self._repository_news.create(new_model)
+            jobs_logger.info(f'Обработана новость')
         except Exception as e:
             jobs_logger.error(f'Error while inserting into database: {e}')
+            return False
+
+        try:
+            await producer.send({"text_id": news.id, "text": news.text, "correlation_id": str(news.id)})
+        except Exception as e:
+            jobs_logger.error(f'Error while sending message to queue: {e}')
             return False
 
         return True
