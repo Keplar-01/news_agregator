@@ -4,7 +4,7 @@ from sqlalchemy import Table, ForeignKey
 from sqlalchemy.dialects.postgresql import ENUM
 from sqlalchemy.orm import relationship
 
-# Определение связующей таблицы
+
 user_classes = Table('user_classes', _database.Base.metadata,
     _sql.Column('user_id', _sql.Integer, ForeignKey('users.id')),
     _sql.Column('class_id', _sql.Integer, ForeignKey('classes.id'))

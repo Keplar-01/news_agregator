@@ -21,7 +21,6 @@ from schemas.user_schema import UserOutput
 _service = NewsService(Session())
 
 base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
- # Замените 'task_queue' на имя вашей очереди
 
 router = APIRouter(
     prefix="/news",

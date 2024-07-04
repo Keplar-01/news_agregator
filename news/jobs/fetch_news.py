@@ -1,4 +1,3 @@
-# scheduler_jobs.py
 import datetime
 import logging
 

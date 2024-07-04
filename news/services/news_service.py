@@ -114,18 +114,14 @@ class NewsService():
         return await self.news_repository.update(news, update_data)
 
     async def get_train_news(self):
-        # Получить все размеченные новости
         news = await self.news_repository.get_all(is_train=True)
 
-        # Получить все классы и создать словарь {id: name}
         classes = await self.classes_repository.get_all()
         classes_dict = {c.id: c.description for c in classes}
 
-        # Создать DataFrame с двумя столбцами: class и text
         df = pd.DataFrame([(classes_dict.get(n.classes_id, "Unknown"), n.text) for n in news],
                           columns=['class', 'text'])
 
-        # Сохранить DataFrame в CSV-файл
         df.to_csv('train_news.csv', index=False)
 
         return 'train_news.csv'

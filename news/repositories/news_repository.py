@@ -108,7 +108,7 @@ class NewsRepository(RepositoryInterface):
             query = query.filter(_orm.News.date >= date_from)
 
         if classes is not None:
-            classes = list(map(int, classes))  # convert list of strings to list of integers
+            classes = list(map(int, classes))
             query = query.join(_orm.News.classes).filter(Classes.id.in_(classes))
 
         query = query.order_by(desc(_orm.News.date))
