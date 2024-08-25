@@ -1,0 +1,4 @@
+data
+docker/data
+docker/db_data
+.env

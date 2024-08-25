@@ -1,0 +1,40 @@
+version: "3.8"
+
+services:
+  auth_service:
+    container_name: auth_service_py
+    build:
+      context: ./auth_service
+      dockerfile: /docker/Dockerfile
+    command: [ "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000" ]
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./auth_service:/app
+      - ./auth_service/docker/data:/app/data
+    depends_on:
+      - auth_service_db
+    networks:
+      - na_network
+    env_file:
+      - ./auth_service/.env
+
+  auth_service_db:
+    container_name: auth_service_db
+    image: postgres:13
+    ports:
+      - "5432:5432"
+    networks:
+      - na_network
+    env_file:
+      - ./auth_service/.env
+    environment:
+      POSTGRES_USER: $POSTGRES_USER
+      POSTGRES_PASSWORD: $POSTGRES_PASSWORD
+      POSTGRES_DB: $POSTGRES_DB
+    volumes:
+      - ./auth_service/docker/db_data:/var/lib/postgresql/data
+
+networks:
+  na_network:
+    driver: bridge
